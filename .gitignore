@@ -4,8 +4,7 @@ __pycache__/
 *$py.class
 
 # IDE
-.idea
-idea
+.idea/
 
 # Installer logs
 pip-log.txt
@@ -25,7 +24,6 @@ coverage.xml
 .hypothesis/
 .pytest_cache/
 
-
 # Environments
 .env
 .venv
@@ -34,3 +32,6 @@ venv/
 ENV/
 env.bak/
 venv.bak/
+
+# App data
+espn-data/
