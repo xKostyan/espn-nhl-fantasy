@@ -16,6 +16,15 @@ def get_args():
     return parser.parse_args()
 
 
+def get_league_config(_league_id) -> dict:
+    """
+    Return config for provided league
+    :param int _league_id: ID of the espn league. League must be setup with 'init-new-league.py' prior to this.
+    """
+    with open('espn-data/{}/league-config.json'.format(_league_id)) as _f:
+        return json.load(_f)
+
+
 def get_years() -> list:
     """
     Generate a list of years to get data about players for.
@@ -40,6 +49,20 @@ def get_years() -> list:
     return ret
 
 
+def setup_schema(_league_args) -> dict:
+    """
+    Returns a top level data structure (dict). Use with 'current year'.
+    :param dict _league_args: Dict with values to use as **kvargs to get league info.
+    :return: Dictionary with defined player ids.
+    """
+    league = League(**_league_args)
+    schema = dict()
+    schema['years'] = list()
+    schema['players'] = {key: dict() for key in league.player_map.keys() if isinstance(key, int)}
+
+    return schema
+
+
 def main():
     args = get_args()
     kwargs = {
@@ -47,20 +70,26 @@ def main():
         'espn_s2': args.espn_s2,
         'swid': args.swid
     }
-    # dump data to files
-    full_data = dict()
-    full_data["player_map"] = dict()
+
+    try:
+        league_config = get_league_config(kwargs['league_id'])
+    except FileNotFoundError:
+        print('Unable to locate configuration for League_id: {}.'
+              '\nSetup with "init-new-league.py"'.format(kwargs['league_id']))
+        exit(-1)
 
     years = get_years()
+    kwargs['year'] = years[0]
+    full_data = setup_schema(kwargs)
     for year in years:
         print('Getting data for year {} ...'.format(year))
         kwargs['year'] = year
         try:
             league = League(**kwargs)
+            full_data['years'].add(year)
             fa = league.free_agents(size=10000)
             draft = league.espn_request.get_league_draft()
-            with open(str(year) + "-league.json", "w") as _f:
-                json.dump(league.player_map, _f, indent=2)
+
         except requests.espn_requests.ESPNAccessDenied:
             print("Logged-in user does not have access to year {}".format(year))
             pass
