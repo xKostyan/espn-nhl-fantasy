@@ -59,9 +59,42 @@ def setup_schema(_league_args) -> dict:
     schema = dict()
     schema['years'] = list()
     schema['players'] = {key: dict() for key in league.player_map.keys() if isinstance(key, int)}
-
     return schema
 
+
+# def get_fantasy_avg(_stats, _league_config) -> float:
+#     """
+#     returns fantasy avg value for players stats based on league scoring
+#     :param dict _stats: stats dictionary of a player. Works
+#     """
+    # avg =
+    # return avg
+def del_key(_dict, _key):
+    if _key in _dict:
+        del _dict[_key]
+
+
+def aggregate_data(_full_data, _league_config, _free_agents, _draft, _year) -> dict:
+    for player in _free_agents:
+        player_dict = clean_player_dict(vars(player))
+
+        # get_fantasy_avg(player_dict['stats'])
+        _full_data['players'][player.playerId] = player_dict
+    return _full_data
+
+
+def clean_player_dict(_player_dict) -> dict:
+    del_key(_player_dict, 'lineupSlot')
+    del_key(_player_dict, 'eligibleSlots')
+    del_key(_player_dict, 'acquisitionType')
+    del_key(_player_dict, 'injuryStatus')
+    del_key(_player_dict, 'injured')
+    for stat in _player_dict['stats']:
+        if 'Total' or 'Projected' in stat:
+            pass
+        else:
+            del_key(_player_dict['stats'], stat)
+    return _player_dict
 
 def main():
     args = get_args()
@@ -71,6 +104,7 @@ def main():
         'swid': args.swid
     }
 
+    league_config = dict()
     try:
         league_config = get_league_config(kwargs['league_id'])
     except FileNotFoundError:
@@ -86,9 +120,10 @@ def main():
         kwargs['year'] = year
         try:
             league = League(**kwargs)
-            full_data['years'].add(year)
+            full_data['years'].append(year)
             fa = league.free_agents(size=10000)
             draft = league.espn_request.get_league_draft()
+            full_data = aggregate_data(full_data, league_config, fa, draft, year)
 
         except requests.espn_requests.ESPNAccessDenied:
             print("Logged-in user does not have access to year {}".format(year))
