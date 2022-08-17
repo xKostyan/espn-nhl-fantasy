@@ -1,4 +1,5 @@
 from datetime import date, datetime
+from typing import Tuple
 import argparse
 import json
 
@@ -59,16 +60,41 @@ def setup_schema(_league_args) -> dict:
     schema = dict()
     schema['years'] = list()
     schema['players'] = {key: dict() for key in league.player_map.keys() if isinstance(key, int)}
+    for key in schema['players']:
+        schema['players'][key]['name'] = league.player_map[key]
     return schema
 
 
-# def get_fantasy_avg(_stats, _league_config) -> float:
-#     """
-#     returns fantasy avg value for players stats based on league scoring
-#     :param dict _stats: stats dictionary of a player. Works
-#     """
-    # avg =
-    # return avg
+def get_fantasy_avg(_stats, _league_config, _is_goalie, _name) -> Tuple[float, float]:
+    """
+    returns fantasy avg value for players stats based on league scoring
+    :param dict _stats: stats dictionary of a player.
+    :param dict _league_config: League config dictionary to calculate points
+    """
+
+    avg = 0.0
+    total = 0.0
+    try:
+        if _is_goalie:
+            scoring = _league_config['scoring']['goaltenders']
+        else:
+            scoring = _league_config['scoring']['skaters']
+
+        for key in scoring:
+            if key not in _stats.keys():
+                continue
+            total += scoring[key] * _stats[key]
+        if _is_goalie:
+            avg = total / _stats['GS']
+        else:
+            avg = total/_stats['GP']
+    except KeyError as ex:
+        print(ex)
+        print('Error: {name}\n{stat}'.format(name=_name, stat=_stats))
+        return 0.0, 0.0
+    return avg, total
+
+
 def del_key(_dict, _key):
     if _key in _dict:
         del _dict[_key]
@@ -76,10 +102,18 @@ def del_key(_dict, _key):
 
 def aggregate_data(_full_data, _league_config, _free_agents, _draft, _year) -> dict:
     for player in _free_agents:
+        is_goalie = False
+        avg = 0.0
+        total = 0.0
         player_dict = clean_player_dict(vars(player))
+        if player_dict['position'] == 'Goalie':
+            is_goalie = True
 
-        # get_fantasy_avg(player_dict['stats'])
-        _full_data['players'][player.playerId] = player_dict
+        for stat in player_dict['stats']:
+            avg, total = get_fantasy_avg(player_dict['stats'][stat]['total'], _league_config, is_goalie, player_dict['name'])
+            player_dict['stats'][stat]['total']['f_avg'] = avg
+            player_dict['stats'][stat]['total']['f_total'] = total
+        _full_data['players'][player.playerId][_year] = player_dict
     return _full_data
 
 
@@ -95,6 +129,7 @@ def clean_player_dict(_player_dict) -> dict:
         else:
             del_key(_player_dict['stats'], stat)
     return _player_dict
+
 
 def main():
     args = get_args()
