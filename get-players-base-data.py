@@ -89,9 +89,13 @@ def get_fantasy_avg(_stats, _league_config, _is_goalie, _name) -> Tuple[float, f
         else:
             avg = total/_stats['GP']
     except KeyError as ex:
-        print(ex)
+        print(f"Unexpected {ex=}, {type(ex)=}")
         print('Error: {name}\n{stat}'.format(name=_name, stat=_stats))
         return 0.0, 0.0
+    except ZeroDivisionError as ex:
+        print(f"Unexpected {ex=}, {type(ex)=}")
+        print('Error: {name}\n{stat}'.format(name=_name, stat=_stats))
+        return 0.0, total
     return avg, total
 
 
@@ -102,33 +106,45 @@ def del_key(_dict, _key):
 
 def aggregate_data(_full_data, _league_config, _free_agents, _draft, _year) -> dict:
     for player in _free_agents:
-        is_goalie = False
-        avg = 0.0
-        total = 0.0
-        player_dict = clean_player_dict(vars(player))
-        if player_dict['position'] == 'Goalie':
-            is_goalie = True
+        try:
+            is_goalie = False
+            avg = 0.0
+            total = 0.0
+            player_dict = clean_player_dict(vars(player))
 
-        for stat in player_dict['stats']:
-            avg, total = get_fantasy_avg(player_dict['stats'][stat]['total'], _league_config, is_goalie, player_dict['name'])
-            player_dict['stats'][stat]['total']['f_avg'] = avg
-            player_dict['stats'][stat]['total']['f_total'] = total
-        _full_data['players'][player.playerId][_year] = player_dict
+            # TODO debug by name:
+            # if player_dict['name'] in ['Kevin Lankinen']:
+            #     print()
+
+            if player_dict['position'] == 'Goalie':
+                is_goalie = True
+            # TODO filter stats[stat] by current year
+            # TODO BUG previous years retain 'Last xyz' values
+            for stat in player_dict['stats']:
+                avg, total = get_fantasy_avg(player_dict['stats'][stat]['total'], _league_config, is_goalie, player_dict['name'])
+                player_dict['stats'][stat]['total']['f_avg'] = avg
+                player_dict['stats'][stat]['total']['f_total'] = total
+            _full_data['players'][player.playerId][_year] = player_dict
+        except KeyError as ex:
+            print(f"Unexpected {ex=}, {type(ex)=}")
+            print('Error: {name}\n{id}'.format(name=player.name, id=player.playerId))
+            continue
     return _full_data
 
 
 def clean_player_dict(_player_dict) -> dict:
-    del_key(_player_dict, 'lineupSlot')
-    del_key(_player_dict, 'eligibleSlots')
-    del_key(_player_dict, 'acquisitionType')
-    del_key(_player_dict, 'injuryStatus')
-    del_key(_player_dict, 'injured')
-    for stat in _player_dict['stats']:
+    tmp = dict(_player_dict)
+    del_key(tmp, 'lineupSlot')
+    del_key(tmp, 'eligibleSlots')
+    del_key(tmp, 'acquisitionType')
+    del_key(tmp, 'injuryStatus')
+    del_key(tmp, 'injured')
+    for stat in tmp['stats']:
         if 'Total' or 'Projected' in stat:
             pass
         else:
-            del_key(_player_dict['stats'], stat)
-    return _player_dict
+            del_key(tmp['stats'], stat)
+    return tmp
 
 
 def main():
@@ -157,12 +173,21 @@ def main():
             league = League(**kwargs)
             full_data['years'].append(year)
             fa = league.free_agents(size=10000)
+            # TODO Debug file data
+            with open('fa-{}.txt'.format(year), 'w') as _f:
+                file_dict = {'data': []}
+                for a in fa:
+                    file_dict['data'].append(vars(a))
+                json.dump(file_dict, _f, indent=2)
+
             draft = league.espn_request.get_league_draft()
             full_data = aggregate_data(full_data, league_config, fa, draft, year)
 
         except requests.espn_requests.ESPNAccessDenied:
             print("Logged-in user does not have access to year {}".format(year))
             pass
+
+    print()
 
 
 if __name__ == '__main__':
