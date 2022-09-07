@@ -72,6 +72,26 @@ def get_fantasy_avg(_stats, _league_config, _is_goalie, _name) -> Tuple[float, f
     :param dict _league_config: League config dictionary to calculate points
     """
 
+    def goalie_avg(_stats, _total):
+        # there seems to be no cases in the data where there is total projected for the goalie while having zero starts
+        return total / _stats['GS']
+
+    def skater_avg(_stats, _total):
+        games_played = 0
+
+        try:
+            games_played = _stats['GP']
+        except KeyError:
+            pass
+
+        if not games_played:
+            # sometimes projections data has zero for GP even though player has a projection for a season
+            # assuming optimistic 78 games played a season
+            games_played = 78
+
+        return total / games_played
+
+    # TODO missing total points vs ESPN projections
     avg = 0.0
     total = 0.0
     try:
@@ -84,18 +104,18 @@ def get_fantasy_avg(_stats, _league_config, _is_goalie, _name) -> Tuple[float, f
             if key not in _stats.keys():
                 continue
             total += scoring[key] * _stats[key]
-        if _is_goalie:
-            avg = total / _stats['GS']
-        else:
-            avg = total/_stats['GP']
-    except KeyError as ex:
-        print(f"Unexpected {ex=}, {type(ex)=}")
-        print('Error: {name}\n{stat}'.format(name=_name, stat=_stats))
+
+        if total:
+            if _is_goalie:
+                avg = skater_avg(_stats, total)
+            else:
+                avg = skater_avg(_stats, total)
+
+    except Exception as ex:
+        print('Processing a player "{}" has failed miserably!'.format(_name))
+        print(ex)
         return 0.0, 0.0
-    except ZeroDivisionError as ex:
-        print(f"Unexpected {ex=}, {type(ex)=}")
-        print('Error: {name}\n{stat}'.format(name=_name, stat=_stats))
-        return 0.0, total
+
     return avg, total
 
 
@@ -105,9 +125,10 @@ def del_key(_dict, _key):
 
 
 def aggregate_data(_full_data, _league_config, _free_agents, _draft, _year) -> dict:
+    debug_name = 'Calle Jarnkrok'
     for player in _free_agents:
         # TODO remove debug by name:
-        if player.name == 'Leon Draisaitl':
+        if player.name == debug_name:
             print()
         try:
             is_goalie = False
@@ -117,16 +138,16 @@ def aggregate_data(_full_data, _league_config, _free_agents, _draft, _year) -> d
 
             if player_dict['position'] == 'Goalie':
                 is_goalie = True
-            # TODO filter stats[stat] by current year
-            # TODO BUG previous years retain 'Last xyz' values
             for stat in player_dict['stats']:
+                # TODO remove debug by name:
+                if player.name == debug_name:
+                    print()
                 avg, total = get_fantasy_avg(player_dict['stats'][stat]['total'], _league_config, is_goalie, player_dict['name'])
                 player_dict['stats'][stat]['total']['f_avg'] = avg
                 player_dict['stats'][stat]['total']['f_total'] = total
             _full_data['players'][player.playerId][_year] = player_dict
         except KeyError as ex:
-            print(f"Unexpected {ex=}, {type(ex)=}")
-            print('Error: {name}\n{id}'.format(name=player.name, id=player.playerId))
+            print('Looks like a player {} has retired in the latest season. Data is dropped.'.format(player.name))
             continue
     return _full_data
 
@@ -179,12 +200,13 @@ def main():
 
             draft = league.espn_request.get_league_draft()
             full_data = aggregate_data(full_data, league_config, fa, draft, year)
-            with open('fa-cleaned-{}.json'.format(year), 'w') as _f:
-                json.dump(full_data, _f, indent=2)
 
         except requests.espn_requests.ESPNAccessDenied:
             print("Logged-in user does not have access to year {}".format(year))
             pass
+
+    with open('fa-cleaned.json', 'w') as _f:
+        json.dump(full_data, _f, indent=2)
 
     print()
 
