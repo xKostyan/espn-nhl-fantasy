@@ -106,15 +106,14 @@ def del_key(_dict, _key):
 
 def aggregate_data(_full_data, _league_config, _free_agents, _draft, _year) -> dict:
     for player in _free_agents:
+        # TODO remove debug by name:
+        if player.name == 'Leon Draisaitl':
+            print()
         try:
             is_goalie = False
             avg = 0.0
             total = 0.0
-            player_dict = clean_player_dict(vars(player))
-
-            # TODO debug by name:
-            # if player_dict['name'] in ['Kevin Lankinen']:
-            #     print()
+            player_dict = clean_player_dict(vars(player), _year)
 
             if player_dict['position'] == 'Goalie':
                 is_goalie = True
@@ -132,18 +131,21 @@ def aggregate_data(_full_data, _league_config, _free_agents, _draft, _year) -> d
     return _full_data
 
 
-def clean_player_dict(_player_dict) -> dict:
+def clean_player_dict(_player_dict, _year) -> dict:
     tmp = dict(_player_dict)
     del_key(tmp, 'lineupSlot')
     del_key(tmp, 'eligibleSlots')
     del_key(tmp, 'acquisitionType')
     del_key(tmp, 'injuryStatus')
     del_key(tmp, 'injured')
+    tmp_stats = dict(tmp['stats'])
     for stat in tmp['stats']:
-        if 'Total' or 'Projected' in stat:
+        if 'Total {}'.format(_year) in stat or 'Projected {}'.format(_year) in stat:
             pass
         else:
-            del_key(tmp['stats'], stat)
+            del_key(tmp_stats, stat)
+    tmp['stats'] = dict(tmp_stats)
+
     return tmp
 
 
@@ -174,14 +176,11 @@ def main():
             full_data['years'].append(year)
             fa = league.free_agents(size=10000)
             # TODO Debug file data
-            with open('fa-{}.txt'.format(year), 'w') as _f:
-                file_dict = {'data': []}
-                for a in fa:
-                    file_dict['data'].append(vars(a))
-                json.dump(file_dict, _f, indent=2)
 
             draft = league.espn_request.get_league_draft()
             full_data = aggregate_data(full_data, league_config, fa, draft, year)
+            with open('fa-cleaned-{}.json'.format(year), 'w') as _f:
+                json.dump(full_data, _f, indent=2)
 
         except requests.espn_requests.ESPNAccessDenied:
             print("Logged-in user does not have access to year {}".format(year))
