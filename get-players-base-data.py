@@ -1,8 +1,13 @@
-from datetime import date, datetime
+from datetime import date
 from typing import Tuple
 import argparse
 import json
 
+# TODO espn request for free agents by default only handles 'available' players
+# TODO currently i edited the library but it needs to be properly overwritten dynamically
+
+# TODO Include Plyer draft prices in stats
+# TODO Implement Fantasy League Price adjustments
 from espn_api import requests
 from espn_api.hockey import League
 
@@ -61,6 +66,7 @@ def setup_schema(_league_args) -> dict:
     schema['years'] = list()
     schema['players'] = {key: dict() for key in league.player_map.keys() if isinstance(key, int)}
     for key in schema['players']:
+        # noinspection PyTypeChecker
         schema['players'][key]['name'] = league.player_map[key]
     return schema
 
@@ -68,12 +74,16 @@ def setup_schema(_league_args) -> dict:
 def get_fantasy_avg(_stats, _league_config, _is_goalie, _name) -> Tuple[float, float]:
     """
     returns fantasy avg value for players stats based on league scoring
+    :param bool _is_goalie: Flag to indicate if player is a goalie
+    :param str _name: Player name
     :param dict _stats: stats dictionary of a player.
     :param dict _league_config: League config dictionary to calculate points
+    :return: calculated avg and total points as tuple value
     """
 
     def goalie_avg(_stats, _total):
         # there seems to be no cases in the data where there is total projected for the goalie while having zero starts
+        # like in skaters projections
         return total / _stats['GS']
 
     def skater_avg(_stats, _total):
@@ -91,7 +101,6 @@ def get_fantasy_avg(_stats, _league_config, _is_goalie, _name) -> Tuple[float, f
 
         return total / games_played
 
-    # TODO missing total points vs ESPN projections
     avg = 0.0
     total = 0.0
     try:
@@ -107,53 +116,73 @@ def get_fantasy_avg(_stats, _league_config, _is_goalie, _name) -> Tuple[float, f
 
         if total:
             if _is_goalie:
-                avg = skater_avg(_stats, total)
+                avg = goalie_avg(_stats, total)
             else:
                 avg = skater_avg(_stats, total)
 
     except Exception as ex:
-        print('Processing a player "{}" has failed miserably!'.format(_name))
+        # So far this happens for goalies that only came into games on relife and had zero game starts during a year
+        print('\n!!!!\nProcessing a player "{}" has failed miserably!'.format(_name))
         print(ex)
+        print('!!!!\n')
         return 0.0, 0.0
-
     return avg, total
 
 
 def del_key(_dict, _key):
+    """
+    Delete a key and all it's values in a dictionary
+    :param dict _dict: Dictionary containing the key
+    :param str _key: Key to delete
+    """
     if _key in _dict:
         del _dict[_key]
 
 
 def aggregate_data(_full_data, _league_config, _free_agents, _draft, _year) -> dict:
-    debug_name = 'Calle Jarnkrok'
+    """
+    Update main data with a data for current year
+    :param dict _full_data: Dictionary containing full data
+    :param dict _league_config: Data about Fantasy league, like scoring values
+    :param list _free_agents: ESPN data of players in the league
+    :param _draft:
+    :param _year:
+    :return:
+    """
     for player in _free_agents:
-        # TODO remove debug by name:
-        if player.name == debug_name:
-            print()
         try:
             is_goalie = False
-            avg = 0.0
-            total = 0.0
             player_dict = clean_player_dict(vars(player), _year)
 
             if player_dict['position'] == 'Goalie':
                 is_goalie = True
             for stat in player_dict['stats']:
-                # TODO remove debug by name:
-                if player.name == debug_name:
-                    print()
-                avg, total = get_fantasy_avg(player_dict['stats'][stat]['total'], _league_config, is_goalie, player_dict['name'])
+                avg, total = get_fantasy_avg(
+                    player_dict['stats'][stat]['total'],
+                    _league_config,
+                    is_goalie,
+                    player.name
+                )
+
                 player_dict['stats'][stat]['total']['f_avg'] = avg
                 player_dict['stats'][stat]['total']['f_total'] = total
             _full_data['players'][player.playerId][_year] = player_dict
-        except KeyError as ex:
+        except KeyError:
             print('Looks like a player {} has retired in the latest season. Data is dropped.'.format(player.name))
             continue
     return _full_data
 
 
 def clean_player_dict(_player_dict, _year) -> dict:
+    """
+    Drops some data that is not important
+    :param dict _player_dict: Player data
+    :param str _year: Current year
+    :return: returns lean player data
+    """
     tmp = dict(_player_dict)
+    del_key(tmp, 'name')
+    del_key(tmp, 'playerId')
     del_key(tmp, 'lineupSlot')
     del_key(tmp, 'eligibleSlots')
     del_key(tmp, 'acquisitionType')
@@ -161,12 +190,12 @@ def clean_player_dict(_player_dict, _year) -> dict:
     del_key(tmp, 'injured')
     tmp_stats = dict(tmp['stats'])
     for stat in tmp['stats']:
+        # only keep Total and Projections data. This removes all 'last x days' stats
         if 'Total {}'.format(_year) in stat or 'Projected {}'.format(_year) in stat:
             pass
         else:
             del_key(tmp_stats, stat)
     tmp['stats'] = dict(tmp_stats)
-
     return tmp
 
 
@@ -196,7 +225,6 @@ def main():
             league = League(**kwargs)
             full_data['years'].append(year)
             fa = league.free_agents(size=10000)
-            # TODO Debug file data
 
             draft = league.espn_request.get_league_draft()
             full_data = aggregate_data(full_data, league_config, fa, draft, year)
@@ -205,7 +233,7 @@ def main():
             print("Logged-in user does not have access to year {}".format(year))
             pass
 
-    with open('fa-cleaned.json', 'w') as _f:
+    with open('espn-data/{}/player-draft-data.json'.format(kwargs['league_id']), '+w') as _f:
         json.dump(full_data, _f, indent=2)
 
     print()
@@ -213,6 +241,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-
-
-
