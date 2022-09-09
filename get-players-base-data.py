@@ -6,7 +6,6 @@ import json
 # TODO espn request for free agents by default only handles 'available' players
 # TODO currently i edited the library but it needs to be properly overwritten dynamically
 
-# TODO Include Plyer draft prices in stats
 # TODO Implement Fantasy League Price adjustments
 from espn_api import requests
 from espn_api.hockey import League
@@ -139,14 +138,13 @@ def del_key(_dict, _key):
         del _dict[_key]
 
 
-def aggregate_data(_full_data, _league_config, _free_agents, _draft, _year) -> dict:
+def aggregate_players_data(_full_data, _league_config, _free_agents, _year) -> dict:
     """
     Update main data with a data for current year
     :param dict _full_data: Dictionary containing full data
     :param dict _league_config: Data about Fantasy league, like scoring values
     :param list _free_agents: ESPN data of players in the league
-    :param _draft:
-    :param _year:
+    :param int _year: Year
     :return:
     """
     for player in _free_agents:
@@ -166,10 +164,13 @@ def aggregate_data(_full_data, _league_config, _free_agents, _draft, _year) -> d
 
                 player_dict['stats'][stat]['total']['f_avg'] = avg
                 player_dict['stats'][stat]['total']['f_total'] = total
+
+            # update full data schema with players data
             _full_data['players'][player.playerId][_year] = player_dict
         except KeyError:
             print('Looks like a player {} has retired in the latest season. Data is dropped.'.format(player.name))
             continue
+
     return _full_data
 
 
@@ -177,7 +178,7 @@ def clean_player_dict(_player_dict, _year) -> dict:
     """
     Drops some data that is not important
     :param dict _player_dict: Player data
-    :param str _year: Current year
+    :param int _year: Current year
     :return: returns lean player data
     """
     tmp = dict(_player_dict)
@@ -197,6 +198,24 @@ def clean_player_dict(_player_dict, _year) -> dict:
             del_key(tmp_stats, stat)
     tmp['stats'] = dict(tmp_stats)
     return tmp
+
+
+def parse_draft_data(_full_data, _league_config, _draft, _year):
+    # check if draft completed for current year
+    if not _draft['draftDetail']['drafted']:
+        return _full_data
+
+    # parse over draft
+    for pick in _draft['draftDetail']['picks']:
+        player_id = pick['playerId']
+        try:
+            _full_data['players'][player_id][_year]['draft_pick'] = pick['id']
+        except KeyError:
+            # current drafted player is not in the full data, most likely retired in most recent year
+            continue
+        _full_data['players'][player_id][_year]['draft_keeper'] = pick['keeper']
+        _full_data['players'][player_id][_year]['draft_price'] = pick['bidAmount']
+    return _full_data
 
 
 def main():
@@ -227,7 +246,8 @@ def main():
             fa = league.free_agents(size=10000)
 
             draft = league.espn_request.get_league_draft()
-            full_data = aggregate_data(full_data, league_config, fa, draft, year)
+            full_data = aggregate_players_data(full_data, league_config, fa, year)
+            full_data = parse_draft_data(full_data, league_config, draft, year)
 
         except requests.espn_requests.ESPNAccessDenied:
             print("Logged-in user does not have access to year {}".format(year))
