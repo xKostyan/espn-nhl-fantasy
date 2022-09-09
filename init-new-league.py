@@ -62,7 +62,7 @@ def save_schema(_schema):
         makedirs('espn-data/{}'.format(_schema['id']))
     except FileExistsError:
         pass
-    f_path = 'espn-data/{}/league-config.json'.format(_schema['id'])
+    f_path = 'espn-data/{}/league-scoring-config.json'.format(_schema['id'])
     with open(f_path, 'w') as _file:
         json.dump(_schema, _file, indent=2)
         print('Data saved into \'{}\''.format(f_path))

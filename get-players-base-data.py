@@ -26,7 +26,7 @@ def get_league_config(_league_id) -> dict:
     Return config for provided league
     :param int _league_id: ID of the espn league. League must be setup with 'init-new-league.py' prior to this.
     """
-    with open('espn-data/{}/league-config.json'.format(_league_id)) as _f:
+    with open('espn-data/{}/league-scoring-config.json'.format(_league_id)) as _f:
         return json.load(_f)
 
 
@@ -63,6 +63,7 @@ def setup_schema(_league_args) -> dict:
     league = League(**_league_args)
     schema = dict()
     schema['years'] = list()
+    schema['draft_years'] = list()
     schema['players'] = {key: dict() for key in league.player_map.keys() if isinstance(key, int)}
     for key in schema['players']:
         # noinspection PyTypeChecker
@@ -205,6 +206,8 @@ def parse_draft_data(_full_data, _league_config, _draft, _year):
     if not _draft['draftDetail']['drafted']:
         return _full_data
 
+    # record draft year into full data
+    _full_data['draft_years'].append(_year)
     # parse over draft
     for pick in _draft['draftDetail']['picks']:
         player_id = pick['playerId']
