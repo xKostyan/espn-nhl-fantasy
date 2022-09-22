@@ -63,7 +63,8 @@ def setup_schema(_league_args) -> dict:
     league = League(**_league_args)
     schema = dict()
     schema['years'] = list()
-    schema['draft_years'] = list()
+    schema['draft'] = dict()
+    schema['draft']['draft_years'] = list()
     schema['players'] = {key: dict() for key in league.player_map.keys() if isinstance(key, int)}
     for key in schema['players']:
         # noinspection PyTypeChecker
@@ -201,13 +202,22 @@ def clean_player_dict(_player_dict, _year) -> dict:
     return tmp
 
 
-def parse_draft_data(_full_data, _league_config, _draft, _year):
+def parse_draft_data(_full_data, _draft, _year) -> dict:
+    """
+    Update players data with a draft data for a current year
+    :param dict _full_data: Full players` data
+    :param dict _draft: Draft data for this year
+    :param int _year: current year
+    :return: Updated data with draft values
+    """
     # check if draft completed for current year
     if not _draft['draftDetail']['drafted']:
         return _full_data
 
     # record draft year into full data
-    _full_data['draft_years'].append(_year)
+    _full_data['draft']['draft_years'].append(_year)
+    _full_data['draft'][_year] = dict()
+    _full_data['draft'][_year]['salary_cap'] = _draft['settings']['draftSettings']['auctionBudget']
     # parse over draft
     for pick in _draft['draftDetail']['picks']:
         player_id = pick['playerId']
@@ -218,7 +228,19 @@ def parse_draft_data(_full_data, _league_config, _draft, _year):
             continue
         _full_data['players'][player_id][_year]['draft_keeper'] = pick['keeper']
         _full_data['players'][player_id][_year]['draft_price'] = pick['bidAmount']
+        _full_data['players'][player_id][_year]['draft_cap_percentage'] = get_price_to_cap_percentage(
+            _draft['settings']['draftSettings']['auctionBudget'], pick['bidAmount'])
+
     return _full_data
+
+
+def get_price_to_cap_percentage(_cap, _player_price) -> float:
+    """
+    :param int _cap: Salary cap for the year
+    :param int _player_price: Players draft price
+    :return: How much of the cap in percentage player salary is
+    """
+    return round(_player_price / _cap * 100, 2)
 
 
 def main():
@@ -250,7 +272,7 @@ def main():
 
             draft = league.espn_request.get_league_draft()
             full_data = aggregate_players_data(full_data, league_config, fa, year)
-            full_data = parse_draft_data(full_data, league_config, draft, year)
+            full_data = parse_draft_data(full_data, draft, year)
 
         except requests.espn_requests.ESPNAccessDenied:
             print("Logged-in user does not have access to year {}".format(year))
