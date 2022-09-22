@@ -1,7 +1,7 @@
 from datetime import date
 from typing import Tuple
+from json import dump, load
 import argparse
-import json
 
 # TODO espn request for free agents by default only handles 'available' players
 # TODO currently i edited the library but it needs to be properly overwritten dynamically
@@ -11,7 +11,10 @@ from espn_api import requests
 from espn_api.hockey import League
 
 
-def get_args():
+def get_args() -> argparse.Namespace:
+    """
+    Get command line arguments
+    """
     parser = argparse.ArgumentParser(description='Get credential values by loging into espn league, inspect page, '
                                                  'Application tab -> Storage -> Cookies -> "http://fantasy.espn.com". '
                                                  'Find required values in the list.')
@@ -27,7 +30,7 @@ def get_league_config(_league_id) -> dict:
     :param int _league_id: ID of the espn league. League must be setup with 'init-new-league.py' prior to this.
     """
     with open('espn-data/{}/league-scoring-config.json'.format(_league_id)) as _f:
-        return json.load(_f)
+        return load(_f)
 
 
 def get_years() -> list:
@@ -243,12 +246,17 @@ def get_price_to_cap_percentage(_cap, _player_price) -> float:
     return round(_player_price / _cap * 100, 2)
 
 
-def main():
-    args = get_args()
+def main(_league_id, _espn_s2, _swid):
+    """
+    Main
+    :param int _league_id: Fantasy League ID
+    :param string _espn_s2: Auth value of 'espn_s2' cookie
+    :param string _swid: Auth value of 'swid' cookie
+    """
     kwargs = {
-        'league_id': args.league_id,
-        'espn_s2': args.espn_s2,
-        'swid': args.swid
+        'league_id': _league_id,
+        'espn_s2': _espn_s2,
+        'swid': _swid
     }
 
     league_config = dict()
@@ -279,10 +287,11 @@ def main():
             pass
 
     with open('espn-data/{}/player-draft-data.json'.format(kwargs['league_id']), '+w') as _f:
-        json.dump(full_data, _f, indent=2)
+        dump(full_data, _f, indent=2)
 
     print()
 
 
 if __name__ == '__main__':
-    main()
+    args = get_args()
+    main(args.league_id, args.espn_s2, args.swid)
