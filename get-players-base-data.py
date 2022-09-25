@@ -3,13 +3,11 @@ from typing import Tuple
 from json import dump, load
 import argparse
 
-# TODO espn request for free agents by default only handles 'available' players
-# TODO currently i edited the library but it needs to be properly overwritten dynamically
-
 # TODO Implement Fantasy League Price adjustments
-from espn_api import requests
-from espn_api.hockey import League
 
+from espn_api import requests
+from espn_api_custom import League
+# from espn_api.hockey import League
 
 def get_args() -> argparse.Namespace:
     """
@@ -153,12 +151,22 @@ def aggregate_players_data(_full_data, _league_config, _free_agents, _year) -> d
     :return:
     """
     for player in _free_agents:
+        # if player.name == 'Devon Toews':
+        #     print('DEBUG BREAKPOINT')
+
         try:
+            position = ''
             is_goalie = False
             player_dict = clean_player_dict(vars(player), _year)
 
-            if player_dict['position'] == 'Goalie':
+            if player.position == 'Goalie':
                 is_goalie = True
+
+            if player.position not in ['Goalie', 'Defense']:
+                position = 'Forward'
+            else:
+                position = player.position
+
             for stat in player_dict['stats']:
                 avg, total = get_fantasy_avg(
                     player_dict['stats'][stat]['total'],
@@ -172,6 +180,13 @@ def aggregate_players_data(_full_data, _league_config, _free_agents, _year) -> d
 
             # update full data schema with players data
             _full_data['players'][player.playerId][_year] = player_dict
+
+            if 'position' not in _full_data['players'][player.playerId]:
+                _full_data['players'][player.playerId]['position'] = position
+
+            if 'id' not in _full_data['players'][player.playerId]:
+                _full_data['players'][player.playerId]['id'] = player.playerId
+
         except KeyError:
             print('Looks like a player {} has retired in the latest season. Data is dropped.'.format(player.name))
             continue
@@ -194,6 +209,7 @@ def clean_player_dict(_player_dict, _year) -> dict:
     del_key(tmp, 'acquisitionType')
     del_key(tmp, 'injuryStatus')
     del_key(tmp, 'injured')
+    del_key(tmp, 'position')
     tmp_stats = dict(tmp['stats'])
     for stat in tmp['stats']:
         # only keep Total and Projections data. This removes all 'last x days' stats
@@ -246,6 +262,14 @@ def get_price_to_cap_percentage(_cap, _player_price) -> float:
     return round(_player_price / _cap * 100, 2)
 
 
+def sanity_checker(_full_data):
+    print('Data check '+'*'*100)
+    for pid in _full_data['players']:
+        if 'id' not in _full_data['players'][pid]:
+            print('{} {}'.format(pid,_full_data['players'][pid]['name']))
+    print('Done')
+
+
 def main(_league_id, _espn_s2, _swid):
     """
     Main
@@ -289,7 +313,7 @@ def main(_league_id, _espn_s2, _swid):
     with open('espn-data/{}/player-draft-data.json'.format(kwargs['league_id']), '+w') as _f:
         dump(full_data, _f, indent=2)
 
-    print()
+    sanity_checker(full_data)
 
 
 if __name__ == '__main__':

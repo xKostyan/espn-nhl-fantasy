@@ -2,7 +2,9 @@
 # so it can be used in 'tables' tools
 from json import load
 import argparse
+
 import pandas
+import pandas as pd
 
 
 def get_args() -> argparse.Namespace:
@@ -14,14 +16,40 @@ def get_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
+def load_json(_league_id) -> dict:
+    with open('espn-data/{}/player-draft-data.json'.format(_league_id), 'r') as _f:
+        full_data = load(_f)
+    return full_data
+
+
+def get_player_df(_player_data) -> pandas.DataFrame:
+    position = str()
+    if 'id' not in _player_data:
+        print(_player_data)
+    data = {
+        'id': [_player_data['id']],
+        'name': [_player_data['name']],
+        'position': [_player_data['position']]
+    }
+    tmp_df = pd.DataFrame(data)
+    return tmp_df
+
+
 def main(_league_id):
     """
     Main
     :param int _league_id: Fantasy league ID
     """
-    with open('espn-data/{}/player-draft-data.json'.format(_league_id), 'r') as _f:
-        full_data = load(_f)
 
+    dict_data = load_json(_league_id)
+    df = pd.DataFrame()
+
+    for pid in dict_data['players']:
+        print('debug ' + str(pid))
+        _tmp = get_player_df(dict_data['players'][pid])
+        df = pd.concat([df, _tmp])
+
+    print(df)
     # for years in full_data['years']:
     # pd_data = pandas
     # for player in full_data['players']:
