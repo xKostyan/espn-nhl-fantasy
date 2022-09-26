@@ -175,8 +175,8 @@ def aggregate_players_data(_full_data, _league_config, _free_agents, _year) -> d
                     player.name
                 )
 
-                player_dict['stats'][stat]['total']['f_avg'] = avg
-                player_dict['stats'][stat]['total']['f_total'] = total
+                player_dict['stats'][stat]['total']['f_avg'] = round(avg, 2)
+                player_dict['stats'][stat]['total']['f_total'] = round(total, 2)
 
             # update full data schema with players data
             _full_data['players'][player.playerId][_year] = player_dict
