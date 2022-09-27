@@ -5,6 +5,7 @@ __pycache__/
 
 # IDE
 .idea/
+.vscode/
 
 # Installer logs
 pip-log.txt
