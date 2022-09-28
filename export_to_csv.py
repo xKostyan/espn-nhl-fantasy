@@ -89,8 +89,27 @@ def main(_league_id) -> pandas.DataFrame:
                     values.append(yd['draft_price']) if 'draft_price' in yd.keys() else values.append(nan)
                     values.append(yd['draft_cap_percentage']) if 'draft_cap_percentage' in yd.keys() else values.append(nan)
 
-                    values.append(yd['stats']['Projected {}'.format(year)]['total']['GP']) if 'Projected {}'.format(year) in yd['stats'].keys() else values.append(nan)
-                    values.append(yd['stats']['Total {}'.format(year)]['total']['GP']) if 'Total {}'.format(year) in yd['stats'].keys() else values.append(nan)
+                    if 'Projected {}'.format(year) in yd['stats'].keys():
+                        if 'GP' in yd['stats']['Projected {}'.format(year)]['total']:
+                            values.append(yd['stats']['Projected {}'.format(year)]['total']['GP'])
+                        else:
+                            # goalies do not have GP, they do GS
+                            values.append(yd['stats']['Projected {}'.format(year)]['total']['GS'])
+                    else:
+                        values.append(nan)
+
+                    if 'Total {}'.format(year) in yd['stats'].keys():
+                        if 'GP' in yd['stats']['Total {}'.format(year)]['total']:
+                            values.append(yd['stats']['Total {}'.format(year)]['total']['GP'])
+                        else:
+                            # goalies do not have GP, they do GS
+                            values.append(yd['stats']['Total {}'.format(year)]['total']['GS'])
+                    else:
+                        values.append(nan)
+
+                    # TODO test and remove if working
+                    # values.append(yd['stats']['Projected {}'.format(year)]['total']['GP']) if 'Projected {}'.format(year) in yd['stats'].keys() else values.append(nan)
+                    # values.append(yd['stats']['Total {}'.format(year)]['total']['GP']) if 'Total {}'.format(year) in yd['stats'].keys() else values.append(nan)
                     
                     values.append(yd['stats']['Projected {}'.format(year)]['total']['f_total']) if 'Projected {}'.format(year) in yd['stats'].keys() else values.append(nan)
                     values.append(yd['stats']['Total {}'.format(year)]['total']['f_total']) if 'Total {}'.format(year) in yd['stats'].keys() else values.append(nan)
