@@ -7,7 +7,7 @@ import pandas
 from numpy import nan
 
 
-YEAR_COLUMNS = ['keeper','price','cap%','avg_proj','avg','proj_total','total']
+YEAR_COLUMNS = ['keeper','price','cap%','gp_proj','gp','total_proj','total','avg_proj','avg']
 
 
 def get_args() -> argparse.Namespace:
@@ -89,10 +89,13 @@ def main(_league_id) -> pandas.DataFrame:
                     values.append(yd['draft_price']) if 'draft_price' in yd.keys() else values.append(nan)
                     values.append(yd['draft_cap_percentage']) if 'draft_cap_percentage' in yd.keys() else values.append(nan)
 
-                    values.append(yd['stats']['Projected {}'.format(year)]['total']['f_avg']) if 'Projected {}'.format(year) in yd['stats'].keys() else values.append(nan)
-                    values.append(yd['stats']['Total {}'.format(year)]['total']['f_avg']) if 'Total {}'.format(year) in yd['stats'].keys() else values.append(nan)
+                    values.append(yd['stats']['Projected {}'.format(year)]['total']['GP']) if 'Projected {}'.format(year) in yd['stats'].keys() else values.append(nan)
+                    values.append(yd['stats']['Total {}'.format(year)]['total']['GP']) if 'Total {}'.format(year) in yd['stats'].keys() else values.append(nan)
+                    
                     values.append(yd['stats']['Projected {}'.format(year)]['total']['f_total']) if 'Projected {}'.format(year) in yd['stats'].keys() else values.append(nan)
                     values.append(yd['stats']['Total {}'.format(year)]['total']['f_total']) if 'Total {}'.format(year) in yd['stats'].keys() else values.append(nan)
+                    values.append(yd['stats']['Projected {}'.format(year)]['total']['f_avg']) if 'Projected {}'.format(year) in yd['stats'].keys() else values.append(nan)
+                    values.append(yd['stats']['Total {}'.format(year)]['total']['f_avg']) if 'Total {}'.format(year) in yd['stats'].keys() else values.append(nan)
 
                     df.loc[int(pid), idx[year, YEAR_COLUMNS]] = values
                 else:
